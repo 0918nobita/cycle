@@ -1,38 +1,44 @@
 import { Driver, run } from '@cycle/run';
-import { Stream } from 'xstream';
+import xs, { Listener, Producer, Stream } from 'xstream';
 
 type Named<Name extends string, Effect> = { [_ in Name]: Effect };
 
-type Eff = 'custom';
+type Eff = 'dateTime';
 
-type AnonSi = Stream<number>;
-type AnonSo = Stream<string>;
+type AnonSi = Stream<unknown>;
+type AnonSo = Stream<Date>;
 
 type NamedSi = Named<Eff, AnonSi>;
 type NamedSo = Named<Eff, AnonSo>;
 
-function main({ custom }: NamedSo): NamedSi {
-  custom.addListener({
+function main({ dateTime }: NamedSo): NamedSi {
+  dateTime.addListener({
     next(v) {
       console.log({ v });
     },
   });
 
+  const producer: Producer<unknown> & { id: number } = {
+    id: 0,
+    start(listener: Listener<unknown>) {
+      this.id = setInterval(() => listener.next(null), 1000);
+    },
+    stop() {
+      clearInterval(this.id);
+    },
+  };
+
   return {
-    custom: Stream.from([1, 2, 3]),
+    dateTime: xs.create(producer),
   };
 }
 
-function makeMyDriver(): Driver<AnonSi, AnonSo> {
-  return function counterDriver($) {
-    return $.map((i) => `${i}!`);
+function makeDateTimeDriver(): Driver<AnonSi, AnonSo> {
+  return function dateTimeDriver($: AnonSi): AnonSo {
+    return $.map((_) => new Date());
   };
 }
 
 run(main, {
-  custom: makeMyDriver(),
+  dateTime: makeDateTimeDriver(),
 });
-
-// 1!
-// 2!
-// 3!
